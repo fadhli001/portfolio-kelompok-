@@ -1,0 +1,38 @@
+query3 = """
+drop table if exists `aqueous-freedom-398208.OFD_Team_1.coding_id_customer_segmentasi`;
+CREATE TABLE `aqueous-freedom-398208.OFD_Team_1.coding_id_customer_segmentasi`as
+WITH tabel AS (
+    SELECT
+        c.id AS customer_id,
+        c.name,
+        DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY) AS last_order_date,
+        COUNT(t.id) AS total_transaction,
+        COALESCE(SUM(t.price), 0) AS total_spending
+    FROM aqueous-freedom-398208.ok_food_dataset.customer c
+    LEFT JOIN aqueous-freedom-398208.ok_food_dataset.transaction_2024 t ON c.id = t.customer_id
+    WHERE t.transaction_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+    GROUP BY c.id, c.name
+)
+SELECT
+    customer_id,
+    name,
+    DATE_SUB(CURRENT_DATE(), INTERVAL 0 DAY) AS today_date,
+    DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY) AS last_order,
+    total_transaction,
+    total_spending,
+    CASE 
+        WHEN total_spending >= 500001 THEN 'Big Spender'
+        WHEN total_transaction <= 1 THEN 'New'
+        WHEN total_transaction <= 5 THEN 'Good'
+        WHEN total_transaction <= 10 THEN 'Potential'
+        ELSE 'Loyalist'
+    END AS segmentation
+FROM tabel
+ORDER BY last_order_date DESC;
+
+
+"""
+
+result3 = bigquery_client.query(query3)
+df3 = result3.to_dataframe()
+df3

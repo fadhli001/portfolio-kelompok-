@@ -1,0 +1,42 @@
+query3 = """
+drop table if exists `aqueous-freedom-398208.OFD_Team_1.growth_harian_perkota`;
+create table `aqueous-freedom-398208.OFD_Team_1.growth_harian_perkota` AS
+WITH DailyRevenue AS (
+    SELECT
+        r.city AS Kota,
+        o.order_date AS Tanggal,
+        SUM(o.quantity * f.price) AS Revenue,
+        LAG(SUM(o.quantity * f.price), 1) OVER (PARTITION BY r.city ORDER BY o.order_date) AS Revenue_Hari_Kemarin,
+        LAG(SUM(o.quantity * f.price), 2) OVER (PARTITION BY r.city ORDER BY o.order_date) AS Revenue_Dua_Hari_Sebelumnya
+    FROM
+        `aqueous-freedom-398208.OFD_Team_1.Order` o
+    INNER JOIN
+        `aqueous-freedom-398208.OFD_Team_1.Food` f ON o.fk_food_id = f.id_food
+    INNER JOIN
+        `aqueous-freedom-398208.OFD_Team_1.Customer` c ON o.fk_customer_id = c.id_customer
+    INNER JOIN
+        `aqueous-freedom-398208.OFD_Team_1.Restaurant` r ON f.fk_resto_id = r.id_restaurant
+    GROUP BY
+        r.city, o.order_date
+)
+
+SELECT
+    Kota,
+    Tanggal,
+    COALESCE(Revenue_Hari_Kemarin, Revenue_Dua_Hari_Sebelumnya, 0) AS Revenue_Hari_Kemarin,
+    Revenue,
+    CASE
+        WHEN COALESCE(Revenue_Hari_Kemarin, Revenue_Dua_Hari_Sebelumnya) IS NULL THEN NULL
+        ELSE CONCAT(ROUND(((Revenue - COALESCE(Revenue_Hari_Kemarin, Revenue_Dua_Hari_Sebelumnya)) / NULLIF(COALESCE(Revenue_Hari_Kemarin, Revenue_Dua_Hari_Sebelumnya), 0)) * 100, 2), '%')
+    END AS Growth_Rate_Percentage
+FROM
+    DailyRevenue
+ORDER BY
+    Kota, Tanggal;
+
+
+"""
+
+result3 = bigquery_client.query(query3)
+df3 = result3.to_dataframe()
+df3

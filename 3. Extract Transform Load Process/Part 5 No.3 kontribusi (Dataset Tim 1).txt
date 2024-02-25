@@ -1,0 +1,34 @@
+query4 = """
+drop table if exists `aqueous-freedom-398208.OFD_Team_1.kontribusi_harian_perkota`;
+CREATE TABLE `aqueous-freedom-398208.OFD_Team_1.kontribusi_harian_perkota` AS
+WITH daily_total AS (
+    SELECT
+        order_date,
+        SUM(f.price * o.quantity) AS total_revenue_all_cities
+    FROM `aqueous-freedom-398208.OFD_Team_1.Order` o
+    JOIN `aqueous-freedom-398208.OFD_Team_1.Food` f ON o.fk_food_id = f.id_food
+    JOIN `aqueous-freedom-398208.OFD_Team_1.Restaurant` r ON f.fk_resto_id = r.id_restaurant
+    GROUP BY
+        order_date
+)
+SELECT
+    o.order_date AS date,
+    r.city,
+    SUM(f.price * o.quantity) AS total_revenue,
+    ROUND((SUM(f.price * o.quantity) / dt.total_revenue_all_cities) * 100, 2) AS contribution
+FROM `aqueous-freedom-398208.OFD_Team_1.Order` o
+JOIN `aqueous-freedom-398208.OFD_Team_1.Food` f ON o.fk_food_id = f.id_food
+JOIN `aqueous-freedom-398208.OFD_Team_1.Restaurant` r ON f.fk_resto_id = r.id_restaurant
+JOIN  daily_total dt ON o.order_date = dt.order_date
+GROUP BY
+    r.city, o.order_date, dt.total_revenue_all_cities
+ORDER BY
+    o.order_date, r.city;
+
+
+    """
+
+result4 = bigquery_client.query(query4)
+df4 = result4.to_dataframe()
+
+df4

@@ -1,0 +1,37 @@
+query3 = """
+drop table if exists `aqueous-freedom-398208.OFD_Team_1.coding_id__growth_harian`;
+CREATE TABLE `aqueous-freedom-398208.OFD_Team_1.coding_id__growth_harian`as
+WITH DailyRevenue AS (
+    SELECT
+        r.kota AS Kota,
+        t.transaction_date AS Tanggal,
+        SUM(t.price) AS Revenue,
+        LAG(SUM(t.price), 1) OVER (PARTITION BY r.kota ORDER BY t.transaction_date) AS Revenue_Hari_Kemarin,
+        LAG(SUM(t.price), 2) OVER (PARTITION BY r.kota ORDER BY t.transaction_date) AS Revenue_Dua_Hari_Sebelumnya
+    FROM
+        `aqueous-freedom-398208.ok_food_dataset.transaction_2024` t
+    INNER JOIN
+        `aqueous-freedom-398208.ok_food_dataset.resto` r ON t.resto_id = r.id
+    GROUP BY
+        r.kota, t.transaction_date
+)
+
+SELECT
+    Kota,
+    Tanggal,
+    COALESCE(Revenue_Hari_Kemarin, Revenue_Dua_Hari_Sebelumnya, 0) AS Revenue_Hari_Kemarin,
+    Revenue,
+    CASE
+        WHEN COALESCE(Revenue_Hari_Kemarin, Revenue_Dua_Hari_Sebelumnya) IS NULL THEN NULL
+        ELSE CONCAT(ROUND(((Revenue - COALESCE(Revenue_Hari_Kemarin, Revenue_Dua_Hari_Sebelumnya)) / NULLIF(COALESCE(Revenue_Hari_Kemarin, Revenue_Dua_Hari_Sebelumnya), 0)) * 100, 2), '%')
+    END AS Growth_Rate_Percentage
+FROM
+    DailyRevenue
+ORDER BY
+    Kota, Tanggal;
+
+"""
+
+result3 = bigquery_client.query(query3)
+df3 = result3.to_dataframe()
+df3
